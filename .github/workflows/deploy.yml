@@ -60,7 +60,7 @@ jobs:
 
       # --- 5. DEPLOY APPLICATION ---
       - name: Deploy Application to EC2
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ env.EC2_IP }}
           username: ubuntu
