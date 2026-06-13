@@ -1,0 +1,47 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    name: Drift Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: ./infra/terraform
+        run: terraform init
+
+      - name: Terraform Plan (Drift Detection)
+        working-directory: ./infra/terraform
+        id: plan
+        run: terraform plan -detailed-exitcode -no-color
+        continue-on-error: true
+        env:
+          TF_VAR_key_pair_name: ${{ secrets.AWS_KEY_PAIR_NAME }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+
+      - name: Report Drift Status
+        run: |
+          if [ "${{ steps.plan.outcome }}" == "failure" ]; then
+            echo "DRIFT DETECTED — Infrastructure has changed outside Terraform!"
+            echo "Run 'terraform plan' locally to review changes."
+            exit 1
+          else
+            echo "No drift detected — Infrastructure matches Terraform state."
+          fi

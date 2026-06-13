@@ -1,0 +1,4 @@
+.terraform/
+local_plugins/
+*.tfstate
+*.tfstate.*

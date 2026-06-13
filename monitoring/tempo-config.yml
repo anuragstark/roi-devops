@@ -1,0 +1,32 @@
+# ============================================================
+# Grafana Tempo — Distributed Tracing Configuration
+# ============================================================
+# Receives traces via OTLP (gRPC + HTTP) from OpenTelemetry
+# ============================================================
+
+stream_over_http_enabled: true
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/blocks
+    wal:
+      path: /tmp/tempo/wal
+
+metrics_generator:
+  storage:
+    path: /tmp/tempo/metrics
+  traces_storage:
+    path: /tmp/tempo/metrics/traces
