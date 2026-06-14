@@ -53,16 +53,34 @@ jobs:
       - name: Wait for EC2 SSH to initialize
         run: |
           echo "Waiting for Web Server SSH..."
+          WEB_READY=false
           for i in {1..45}; do
-            nc -z -w5 ${{ env.WEB_PUBLIC_IP }} 22 && echo "Web SSH is ready!" && break
+            if nc -z -w5 ${{ env.WEB_PUBLIC_IP }} 22; then
+              echo "Web SSH is ready!"
+              WEB_READY=true
+              break
+            fi
             sleep 10
           done
+          if [ "$WEB_READY" = false ]; then
+            echo "Timeout waiting for Web Server SSH! The instance might have failed to boot."
+            exit 1
+          fi
           
           echo "Waiting for Monitoring Server SSH..."
+          MON_READY=false
           for i in {1..45}; do
-            nc -z -w5 ${{ env.MONITORING_PUBLIC_IP }} 22 && echo "Monitoring SSH is ready!" && break
+            if nc -z -w5 ${{ env.MONITORING_PUBLIC_IP }} 22; then
+              echo "Monitoring SSH is ready!"
+              MON_READY=true
+              break
+            fi
             sleep 10
           done
+          if [ "$MON_READY" = false ]; then
+            echo "Timeout waiting for Monitoring Server SSH! The instance might have failed to boot."
+            exit 1
+          fi
 
       # --- 5. DEPLOY MONITORING SERVER ---
       - name: Deploy Monitoring to EC2

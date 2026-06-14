@@ -352,6 +352,13 @@ resource "aws_autoscaling_group" "web_asg" {
     }
   }
 
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 0
+    }
+  }
+
   tag {
     key                 = "Name"
     value               = "roi-web-server"
@@ -454,6 +461,13 @@ resource "aws_autoscaling_group" "monitoring_asg" {
       override {
         instance_type = "t3.micro"
       }
+    }
+  }
+
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 0
     }
   }
 
