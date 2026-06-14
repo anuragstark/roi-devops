@@ -54,12 +54,13 @@ jobs:
         run: |
           echo "Waiting for Web Server SSH..."
           WEB_READY=false
-          for i in {1..45}; do
+          for i in {1..90}; do
             if nc -z -w5 ${{ env.WEB_PUBLIC_IP }} 22; then
-              echo "Web SSH is ready!"
+              echo "Web SSH is ready! (attempt $i)"
               WEB_READY=true
               break
             fi
+            echo "Attempt $i/90 - not ready yet, sleeping 10s..."
             sleep 10
           done
           if [ "$WEB_READY" = false ]; then
@@ -69,12 +70,13 @@ jobs:
           
           echo "Waiting for Monitoring Server SSH..."
           MON_READY=false
-          for i in {1..45}; do
+          for i in {1..90}; do
             if nc -z -w5 ${{ env.MONITORING_PUBLIC_IP }} 22; then
-              echo "Monitoring SSH is ready!"
+              echo "Monitoring SSH is ready! (attempt $i)"
               MON_READY=true
               break
             fi
+            echo "Attempt $i/90 - not ready yet, sleeping 10s..."
             sleep 10
           done
           if [ "$MON_READY" = false ]; then
