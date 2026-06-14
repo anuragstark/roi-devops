@@ -272,8 +272,8 @@ resource "aws_launch_template" "web_lt" {
   user_data = base64encode(<<-EOF
               #!/bin/bash
               set -e
-              apt-get update
-              apt-get upgrade -y
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
               apt-get install -y docker-compose-plugin awscli jq
@@ -378,8 +378,8 @@ resource "aws_launch_template" "monitoring_lt" {
   user_data = base64encode(<<-EOF
               #!/bin/bash
               set -e
-              apt-get update
-              apt-get upgrade -y
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
               apt-get install -y docker-compose-plugin awscli jq
