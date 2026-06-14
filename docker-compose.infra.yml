@@ -50,14 +50,11 @@ services:
     image: prom/prometheus:v2.52.0
     container_name: roi_prometheus
     restart: unless-stopped
-    environment:
-      - WEB_PRIVATE_IP=${WEB_PRIVATE_IP}
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus_data:/prometheus
     command:
-      - '--config.expand-env=true'
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
@@ -74,8 +71,8 @@ services:
       - loki
       - tempo
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${DASHBOARD_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${DASHBOARD_PASS:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
     ports:

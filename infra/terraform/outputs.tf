@@ -3,19 +3,9 @@ output "web_public_ip" {
   value       = aws_eip.roi_eip.public_ip
 }
 
-output "web_private_ip" {
-  description = "Private IP address of the Web Server"
-  value       = aws_spot_instance_request.roi_web.private_ip
-}
-
 output "monitoring_public_ip" {
   description = "Public IP address of the Monitoring Server"
-  value       = aws_spot_instance_request.roi_monitoring.public_ip
-}
-
-output "monitoring_private_ip" {
-  description = "Private IP address of the Monitoring Server"
-  value       = aws_spot_instance_request.roi_monitoring.private_ip
+  value       = aws_eip.monitoring_eip.public_ip
 }
 
 output "frontend_url" {
@@ -35,7 +25,7 @@ output "ssh_command_web" {
 
 output "ssh_command_monitoring" {
   description = "SSH command to connect to the Monitoring instance"
-  value       = "ssh -i ~/.ssh/${var.key_pair_name}.pem ubuntu@${aws_spot_instance_request.roi_monitoring.public_ip}"
+  value       = "ssh -i ~/.ssh/${var.key_pair_name}.pem ubuntu@${aws_eip.monitoring_eip.public_ip}"
 }
 
 output "rds_endpoint" {

@@ -59,3 +59,9 @@ variable "account_suffix" {
   type        = string
   default     = "974387"
 }
+
+variable "gh_pat" {
+  description = "GitHub Personal Access Token for triggering webhooks"
+  type        = string
+  sensitive   = true
+}

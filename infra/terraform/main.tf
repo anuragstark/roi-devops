@@ -127,8 +127,8 @@ resource "aws_security_group_rule" "web_to_monitoring_3001" {
   to_port                  = 3001
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  source_security_group_id = aws_security_group.web_sg.id
-  description              = "Allow Web SG to access Grafana"
+  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
+  description              = "Allow Web EIP to access Grafana"
 }
 
 resource "aws_security_group_rule" "web_to_monitoring_9090" {
@@ -137,8 +137,8 @@ resource "aws_security_group_rule" "web_to_monitoring_9090" {
   to_port                  = 9090
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  source_security_group_id = aws_security_group.web_sg.id
-  description              = "Allow Web SG to access Prometheus"
+  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
+  description              = "Allow Web EIP to access Prometheus"
 }
 
 resource "aws_security_group_rule" "web_to_monitoring_9093" {
@@ -147,8 +147,8 @@ resource "aws_security_group_rule" "web_to_monitoring_9093" {
   to_port                  = 9093
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  source_security_group_id = aws_security_group.web_sg.id
-  description              = "Allow Web SG to access Alertmanager"
+  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
+  description              = "Allow Web EIP to access Alertmanager"
 }
 
 # Monitoring -> Web (Prometheus scraping Node Exporter and cAdvisor)
@@ -172,94 +172,280 @@ resource "aws_security_group_rule" "monitoring_to_web_8080" {
   description              = "Allow Monitoring SG to scrape cAdvisor"
 }
 
-# Web Server (Spot Instance)
-resource "aws_spot_instance_request" "roi_web" {
-  ami                            = data.aws_ami.ubuntu.id
-  instance_type                  = var.instance_type
-  key_name                       = var.key_pair_name
-  wait_for_fulfillment           = true
-  instance_interruption_behavior = "terminate"
+data "aws_vpc" "default" {
+  default = true
+}
 
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
 
-  # User data script to install Docker and Docker Compose
-  user_data = <<-EOF
+# IAM Role for EC2 to associate Elastic IP
+resource "aws_iam_role" "ec2_eip_role" {
+  name = "roi-ec2-eip-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "ec2_eip_policy" {
+  name        = "roi-ec2-eip-policy"
+  description = "Allows EC2 instances to associate Elastic IPs"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ec2:AssociateAddress",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeInstances"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_eip_attach" {
+  role       = aws_iam_role.ec2_eip_role.name
+  policy_arn = aws_iam_policy.ec2_eip_policy.arn
+}
+
+resource "aws_iam_instance_profile" "ec2_eip_profile" {
+  name = "roi-ec2-eip-profile"
+  role = aws_iam_role.ec2_eip_role.name
+}
+
+# Elastic IP for Web Server
+resource "aws_eip" "roi_eip" {
+  domain = "vpc"
+  tags = {
+    Name        = "roi-web-eip"
+    Environment = var.environment
+  }
+}
+
+# Elastic IP for Monitoring Server
+resource "aws_eip" "monitoring_eip" {
+  domain = "vpc"
+  tags = {
+    Name        = "roi-monitoring-eip"
+    Environment = var.environment
+  }
+}
+
+# Web Server Launch Template
+resource "aws_launch_template" "web_lt" {
+  name_prefix   = "roi-web-lt-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  key_name      = var.key_pair_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_eip_profile.name
+  }
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.web_sg.id]
+  }
+
+  user_data = base64encode(<<-EOF
               #!/bin/bash
               set -e
               apt-get update
               apt-get upgrade -y
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
-              apt-get install -y docker-compose-plugin
+              apt-get install -y docker-compose-plugin awscli jq
               usermod -aG docker ubuntu
               systemctl enable docker
               systemctl start docker
               mkdir -p /home/ubuntu/app
               chown ubuntu:ubuntu /home/ubuntu/app
+              
+              # Associate Elastic IP
+              TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
+              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.roi_eip.id} --region ${var.aws_region}
+              
+              # Wait 5 seconds for IP to propagate fully
+              sleep 5
+              
+              # Trigger GitHub Actions Webhook to Deploy Code
+              curl -L -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${var.gh_pat}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                https://api.github.com/repos/anuragstark/roi-devops/actions/workflows/deploy.yml/dispatches \
+                -d '{"ref":"main"}'
+              
               echo "Waiting for code push..." > /home/ubuntu/app/STATUS.txt
               echo "Setup completed successfully" > /home/ubuntu/setup-complete.txt
               EOF
+  )
 
-  tags = {
-    Name        = "roi-web-server"
-    Environment = var.environment
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size = 20
+      volume_type = "gp3"
+    }
   }
 
-  root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name        = "roi-web-server"
+      Environment = var.environment
+    }
   }
 }
 
-# Monitoring Server (Spot Instance)
-resource "aws_spot_instance_request" "roi_monitoring" {
-  ami                            = data.aws_ami.ubuntu.id
-  instance_type                  = var.instance_type
-  key_name                       = var.key_pair_name
-  wait_for_fulfillment           = true
-  instance_interruption_behavior = "terminate"
+# Web Server Auto Scaling Group
+resource "aws_autoscaling_group" "web_asg" {
+  name                = "roi-web-asg"
+  desired_capacity    = 1
+  max_size            = 1
+  min_size            = 1
+  vpc_zone_identifier = data.aws_subnets.default.ids
 
-  vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
+  mixed_instances_policy {
+    instances_distribution {
+      on_demand_base_capacity                  = 0
+      on_demand_percentage_above_base_capacity = 0
+      spot_allocation_strategy                 = "lowest-price"
+    }
+    launch_template {
+      launch_template_specification {
+        launch_template_id = aws_launch_template.web_lt.id
+        version            = "$Latest"
+      }
+      override {
+        instance_type = var.instance_type
+      }
+    }
+  }
 
-  user_data = <<-EOF
+  tag {
+    key                 = "Name"
+    value               = "roi-web-server"
+    propagate_at_launch = true
+  }
+}
+
+# Monitoring Server Launch Template
+resource "aws_launch_template" "monitoring_lt" {
+  name_prefix   = "roi-monitoring-lt-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  key_name      = var.key_pair_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_eip_profile.name
+  }
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.monitoring_sg.id]
+  }
+
+  user_data = base64encode(<<-EOF
               #!/bin/bash
               set -e
               apt-get update
               apt-get upgrade -y
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
-              apt-get install -y docker-compose-plugin
+              apt-get install -y docker-compose-plugin awscli jq
               usermod -aG docker ubuntu
               systemctl enable docker
               systemctl start docker
               mkdir -p /home/ubuntu/app
               chown ubuntu:ubuntu /home/ubuntu/app
+              
+              # Associate Elastic IP
+              TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
+              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.monitoring_eip.id} --region ${var.aws_region}
+              
+              # Wait 5 seconds for IP to propagate fully
+              sleep 5
+              
+              # Trigger GitHub Actions Webhook to Deploy Code
+              curl -L -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${var.gh_pat}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                https://api.github.com/repos/anuragstark/roi-devops/actions/workflows/deploy.yml/dispatches \
+                -d '{"ref":"main"}'
+              
+              echo "Waiting for code push..." > /home/ubuntu/app/STATUS.txt
               EOF
+  )
 
-  tags = {
-    Name        = "roi-monitoring-server"
-    Environment = var.environment
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size = 20
+      volume_type = "gp3"
+    }
   }
 
-  root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
-  }
-}
-
-# Elastic IP for stable public address (Web Server)
-resource "aws_eip" "roi_eip" {
-  domain = "vpc"
-
-  tags = {
-    Name        = "roi-platform-eip"
-    Environment = var.environment
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name        = "roi-monitoring-server"
+      Environment = var.environment
+    }
   }
 }
 
-resource "aws_eip_association" "roi_eip_assoc" {
-  instance_id   = aws_spot_instance_request.roi_web.spot_instance_id
-  allocation_id = aws_eip.roi_eip.id
+# Monitoring Server Auto Scaling Group
+resource "aws_autoscaling_group" "monitoring_asg" {
+  name                = "roi-monitoring-asg"
+  desired_capacity    = 1
+  max_size            = 1
+  min_size            = 1
+  vpc_zone_identifier = data.aws_subnets.default.ids
+
+  mixed_instances_policy {
+    instances_distribution {
+      on_demand_base_capacity                  = 0
+      on_demand_percentage_above_base_capacity = 0
+      spot_allocation_strategy                 = "lowest-price"
+    }
+    launch_template {
+      launch_template_specification {
+        launch_template_id = aws_launch_template.monitoring_lt.id
+        version            = "$Latest"
+      }
+      override {
+        instance_type = var.instance_type
+      }
+    }
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "roi-monitoring-server"
+    propagate_at_launch = true
+  }
 }
 
 # RDS Database (Free Tier db.t4g.micro)

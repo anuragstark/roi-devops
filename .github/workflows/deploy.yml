@@ -38,6 +38,7 @@ jobs:
         env:
           TF_VAR_key_pair_name: ${{ secrets.AWS_KEY_PAIR_NAME }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_gh_pat: ${{ secrets.GH_PAT }}
 
       # --- 3. GET DYNAMIC OUTPUTS ---
       - name: Get Terraform Outputs
@@ -45,9 +46,7 @@ jobs:
         working-directory: ./infra/terraform
         run: |
           echo "WEB_PUBLIC_IP=$(terraform output -raw web_public_ip)" >> $GITHUB_ENV
-          echo "WEB_PRIVATE_IP=$(terraform output -raw web_private_ip)" >> $GITHUB_ENV
           echo "MONITORING_PUBLIC_IP=$(terraform output -raw monitoring_public_ip)" >> $GITHUB_ENV
-          echo "MONITORING_PRIVATE_IP=$(terraform output -raw monitoring_private_ip)" >> $GITHUB_ENV
           echo "RDS_ENDPOINT=$(terraform output -raw rds_endpoint)" >> $GITHUB_ENV
 
       # --- 4. WAIT FOR EC2 TO BOOT ---
@@ -75,8 +74,7 @@ jobs:
             git reset --hard origin/main
 
             # Create minimal .env for monitoring stack
-            echo "WEB_PRIVATE_IP=${{ env.WEB_PRIVATE_IP }}" > .env
-            echo "AWS_REGION=us-east-1" >> .env
+            echo "AWS_REGION=us-east-1" > .env
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
             echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
@@ -84,6 +82,8 @@ jobs:
             echo "DB_USER=roi_admin" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             echo "DB_NAME=roi_platform" >> .env
+            echo "DASHBOARD_USER=${{ secrets.DASHBOARD_USER }}" >> .env
+            echo "DASHBOARD_PASS=${{ secrets.DASHBOARD_PASS }}" >> .env
             
             docker network create roi_global_network || true
             docker compose --env-file .env -f docker-compose.infra.yml up -d --build
@@ -159,9 +159,9 @@ jobs:
             
             # Nginx & htpasswd Setup
             sudo apt-get install -y nginx apache2-utils > /dev/null 2>&1 || true
-            sudo htpasswd -b -c /etc/nginx/.htpasswd admin "admin"
+            sudo htpasswd -b -c /etc/nginx/.htpasswd "${{ secrets.DASHBOARD_USER }}" "${{ secrets.DASHBOARD_PASS }}"
             
-            sed -i "s/__MONITORING_PRIVATE_IP__/${{ env.MONITORING_PRIVATE_IP }}/g" /home/ubuntu/app/nginx-proxy.conf
+            sed -i "s/__MONITORING_PRIVATE_IP__/${{ env.MONITORING_PUBLIC_IP }}/g" /home/ubuntu/app/nginx-proxy.conf
             
             sudo cp /home/ubuntu/app/nginx-proxy.conf /etc/nginx/sites-available/roi-platform
             sudo ln -sf /etc/nginx/sites-available/roi-platform /etc/nginx/sites-enabled/
