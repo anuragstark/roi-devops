@@ -181,6 +181,10 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+  filter {
+    name   = "availability-zone"
+    values = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
+  }
 }
 
 # IAM Role for EC2 to associate Elastic IP
@@ -337,7 +341,13 @@ resource "aws_autoscaling_group" "web_asg" {
         version            = "$Latest"
       }
       override {
-        instance_type = var.instance_type
+        instance_type = "t3.small"
+      }
+      override {
+        instance_type = "t3a.small"
+      }
+      override {
+        instance_type = "t3.micro"
       }
     }
   }
@@ -436,7 +446,13 @@ resource "aws_autoscaling_group" "monitoring_asg" {
         version            = "$Latest"
       }
       override {
-        instance_type = var.instance_type
+        instance_type = "t3.small"
+      }
+      override {
+        instance_type = "t3a.small"
+      }
+      override {
+        instance_type = "t3.micro"
       }
     }
   }
