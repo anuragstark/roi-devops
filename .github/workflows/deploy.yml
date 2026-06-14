@@ -9,9 +9,8 @@ name: 1. Deploy Infra & App (Auto on Push)
 # ============================================================
 
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+    types: [trigger-deploy]
   workflow_dispatch: # Allows manual trigger
 
 jobs:
