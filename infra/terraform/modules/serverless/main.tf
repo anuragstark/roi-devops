@@ -1,9 +1,4 @@
-# ============================================================
-# Lambda + EventBridge — Serverless ROI Cron
-# ============================================================
-# Replaces 24/7 roi-cron Docker container with serverless
-# Cost: ~$0.10/month (720 invocations × 256MB × 60s)
-# ============================================================
+# Lambda + EventBridge — Serverless ROI Cron: Replaces 24/7 roi-cron Docker container. Cost: ~$0.10/month.
 
 data "archive_file" "roi_cron" {
   type        = "zip"

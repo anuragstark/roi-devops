@@ -1,15 +1,6 @@
-# ============================================================
-# S3 Buckets
-# ============================================================
-# NOTE: The TF state bucket (roi-platform-tf-state-974387) and
-#       DynamoDB lock table (roi-platform-tf-locks) were created
-#       manually and are NOT managed by Terraform.
-#       Only the uploads bucket is managed here.
-# ============================================================
+# S3 Buckets: Note that TF state bucket and DynamoDB lock table were created manually. Only the uploads bucket is managed here.
 
-# ============================================================
 # 2. Application Uploads Bucket (KYC docs, screenshots, etc.)
-# ============================================================
 resource "aws_s3_bucket" "uploads" {
   bucket = "${var.project_name}-uploads-${var.account_suffix}"
 

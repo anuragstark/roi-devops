@@ -22,8 +22,12 @@ scrape_configs:
   - job_name: roi-backend
     metrics_path: /api/metrics
     static_configs:
-      - targets: ['backend:5000']
+      - targets: ['${WEB_PRIVATE_IP}:5000']
 
   - job_name: node-exporter
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['node-exporter:9100', '${WEB_PRIVATE_IP}:9100']
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080', '${WEB_PRIVATE_IP}:8080']

@@ -1,8 +1,4 @@
-# ============================================================
-# Grafana Tempo — Distributed Tracing Configuration
-# ============================================================
-# Receives traces via OTLP (gRPC + HTTP) from OpenTelemetry
-# ============================================================
+# Grafana Tempo Distributed Tracing Configuration: Receives traces via OTLP (gRPC + HTTP) from OpenTelemetry.
 
 stream_over_http_enabled: true
 server:

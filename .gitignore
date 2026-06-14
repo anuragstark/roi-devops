@@ -36,8 +36,12 @@ docs/
 # OS generated files
 .DS_Store
 .DS_Store?
+.DS_Store
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
+ehthumbs.dbs
 Thumbs.db
+
+# Local development files
+docker-compose.dev.yml

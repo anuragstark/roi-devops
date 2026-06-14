@@ -1,12 +1,6 @@
 name: 3. Destroy Infrastructure (Run ONCE to Cleanup)
 
-# ============================================================
-# Run this MANUALLY when you want to tear down the entire
-# infrastructure (EC2, RDS, etc.) to save costs.
-#
-# HOW TO RUN:
-# GitHub → Actions → "3. Destroy Infrastructure" → Run workflow
-# ============================================================
+# Manual workflow to tear down the entire AWS infrastructure (EC2, RDS) to save costs via GitHub Actions.
 
 on:
   workflow_dispatch: # Manual trigger only! You don't want this running automatically.

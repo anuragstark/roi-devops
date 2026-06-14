@@ -1,8 +1,4 @@
-# ============================================================
-# Prometheus Alert Rules
-# ============================================================
-# Infrastructure + Application alerts for ROI Platform
-# ============================================================
+# Prometheus Alert Rules: Infrastructure + Application alerts for ROI Platform
 
 groups:
   - name: infrastructure

@@ -1,9 +1,4 @@
-# ============================================================
-# IAM Policy for Backend S3 Access
-# ============================================================
-# Scoped least-privilege policy: backend can only read/write
-# to the uploads bucket, nothing else.
-# ============================================================
+# IAM Policy for Backend S3 Access: Scoped least-privilege policy. Backend can only read/write to the uploads bucket.
 
 resource "aws_iam_policy" "backend_s3_uploads" {
   name        = "${var.project_name}-s3-uploads"

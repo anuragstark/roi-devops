@@ -1,9 +1,4 @@
-# ============================================================
-# AWS Secrets Manager Module
-# ============================================================
-# Stores application secrets securely (different from TeleDoc's SSM)
-# Cost: ~$0.40/secret/month
-# ============================================================
+# AWS Secrets Manager Module: Stores application secrets securely (different from TeleDoc's SSM). Cost: ~$0.40/secret/month.
 
 resource "aws_secretsmanager_secret" "db_credentials" {
   name                    = "roi-platform/db-credentials"

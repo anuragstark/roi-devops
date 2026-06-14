@@ -1,9 +1,4 @@
-# ============================================================
-# Prometheus Alertmanager Configuration
-# ============================================================
-# Routes alerts to Discord webhook (or Slack/Email)
-# Replace <DISCORD_WEBHOOK_URL> with your actual webhook URL
-# ============================================================
+# Prometheus Alertmanager Configuration: Routes alerts to Discord webhook. Replace <DISCORD_WEBHOOK_URL> with actual URL.
 
 global:
   resolve_timeout: 5m
@@ -24,7 +19,7 @@ route:
 receivers:
   - name: 'discord'
     webhook_configs:
-      - url: '${DISCORD_WEBHOOK_URL:-http://localhost:9999}'
+      - url: 'http://localhost:9999'
         send_resolved: true
 
 inhibit_rules:

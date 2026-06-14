@@ -1,9 +1,4 @@
-# ============================================================
-# CloudWatch Alarms Module
-# ============================================================
-# Monitors EC2 CPU, RDS connections, and RDS storage
-# Free: first 10 alarms on AWS
-# ============================================================
+# CloudWatch Alarms Module: Monitors EC2 CPU, RDS connections, and RDS storage (Free: first 10 alarms on AWS)
 
 resource "aws_cloudwatch_metric_alarm" "ec2_cpu_high" {
   alarm_name          = "roi-ec2-cpu-high"
