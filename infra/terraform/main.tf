@@ -357,9 +357,6 @@ resource "aws_autoscaling_group" "web_asg" {
       override {
         instance_type = "t3a.small"
       }
-      override {
-        instance_type = "t3.micro"
-      }
     }
   }
 
@@ -473,9 +470,6 @@ resource "aws_autoscaling_group" "monitoring_asg" {
       }
       override {
         instance_type = "t3a.small"
-      }
-      override {
-        instance_type = "t3.micro"
       }
     }
   }
