@@ -94,9 +94,23 @@ jobs:
           timeout: 30m
           command_timeout: 30m
           script: |
-            set -e
             mkdir -p /home/ubuntu/app
             cd /home/ubuntu/app
+            
+            # Wait for Docker to be ready (needed on fresh instances)
+            echo "Waiting for Docker to be ready..."
+            for i in {1..60}; do
+              if command -v docker &> /dev/null && sudo docker info &> /dev/null; then
+                echo "Docker is ready! (attempt $i)"
+                break
+              fi
+              echo "Docker not ready yet (attempt $i/60), waiting 10s..."
+              sleep 10
+            done
+            if ! command -v docker &> /dev/null; then
+              echo "ERROR: Docker failed to install after 10 minutes!"
+              exit 1
+            fi
             
             # Clone/Pull repository
             if [ ! -d ".git" ]; then
@@ -120,6 +134,9 @@ jobs:
             
             docker network create roi_global_network || true
             docker compose --env-file .env -f docker-compose.infra.yml up -d --build
+            
+            echo "Monitoring deployment complete!"
+            sleep 2
 
       # --- 6. DEPLOY WEB SERVER ---
       - name: Deploy Application to Web EC2
@@ -131,10 +148,24 @@ jobs:
           timeout: 30m
           command_timeout: 30m
           script: |
-            set -e
             export DEBIAN_FRONTEND=noninteractive
             mkdir -p /home/ubuntu/app
             cd /home/ubuntu/app
+            
+            # Wait for Docker to be ready (needed on fresh instances where user_data is still running)
+            echo "Waiting for Docker to be ready..."
+            for i in {1..60}; do
+              if command -v docker &> /dev/null && sudo docker info &> /dev/null; then
+                echo "Docker is ready! (attempt $i)"
+                break
+              fi
+              echo "Docker not ready yet (attempt $i/60), waiting 10s..."
+              sleep 10
+            done
+            if ! command -v docker &> /dev/null; then
+              echo "ERROR: Docker failed to install after 10 minutes!"
+              exit 1
+            fi
             
             # Clone/Pull repository
             if [ ! -d ".git" ]; then
@@ -210,17 +241,23 @@ jobs:
             # Tear down old env
             if [ "$ACTIVE_ENV" == "blue" ]; then
               export COMPOSE_PROJECT_NAME="roi_blue"
-              docker compose -f docker-compose.yml down
+              docker compose -f docker-compose.yml down || true
             else
               if docker ps --format '{{.Names}}' | grep -q "^roi_green-backend-1$"; then
                 export COMPOSE_PROJECT_NAME="roi_green"
-                docker compose -f docker-compose.yml down
+                docker compose -f docker-compose.yml down || true
               fi
             fi
 
-            # SSL Configuration
+            # SSL Configuration (run in background so it doesn't break SSH session)
             if ! grep -q "managed by Certbot" /etc/nginx/sites-available/roi-platform 2>/dev/null; then
-                sudo apt-get update -qq
-                sudo apt-get install -y -qq certbot python3-certbot-nginx
-                sudo certbot --nginx --non-interactive --agree-tos -m admin@paisatest.online -d paisatest.online -d www.paisatest.online -d grafana.paisatest.online -d prometheus.paisatest.online --redirect || true
+                nohup bash -c '
+                  export DEBIAN_FRONTEND=noninteractive
+                  sudo apt-get update -qq
+                  sudo apt-get install -y -qq certbot python3-certbot-nginx
+                  sudo certbot --nginx --non-interactive --agree-tos -m admin@paisatest.online -d paisatest.online -d www.paisatest.online -d grafana.paisatest.online -d prometheus.paisatest.online --redirect || true
+                ' > /home/ubuntu/certbot.log 2>&1 &
             fi
+            
+            echo "Deployment complete!"
+            sleep 2

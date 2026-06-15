@@ -32,6 +32,7 @@ terraform.rc
 
 # Ignore private docs
 docs/
+Docs/
 
 # OS generated files
 .DS_Store

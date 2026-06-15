@@ -271,22 +271,26 @@ resource "aws_launch_template" "web_lt" {
 
   user_data = base64encode(<<-EOF
               #!/bin/bash
+              exec > /var/log/user-data.log 2>&1
               export DEBIAN_FRONTEND=noninteractive
               
               # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
-              # Install only awscli via pip3 (Python3 is pre-installed on Ubuntu 24.04, fast ~20s)
               apt-get update -qq
-              apt-get install -y -qq python3-pip
-              pip3 install awscli --break-system-packages --quiet
+              apt-get install -y -qq awscli
               
-              TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-              INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.roi_eip.id} --region ${var.aws_region} || true
+              TOKEN=$(curl -s --retry 3 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -s --retry 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
               
-              # Wait for IP to propagate
+              # Retry EIP association up to 5 times
+              for i in 1 2 3 4 5; do
+                aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.roi_eip.id} --region ${var.aws_region} && break
+                echo "EIP association attempt $i failed, retrying in 5s..."
+                sleep 5
+              done
+              
               sleep 5
               
-              # ── STEP 2: Install Docker (slow, but SSH already works via EIP above) ──
+              # ── STEP 2: Install Docker ──
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
               apt-get install -y docker-compose-plugin jq
@@ -388,16 +392,21 @@ resource "aws_launch_template" "monitoring_lt" {
 
   user_data = base64encode(<<-EOF
               #!/bin/bash
+              exec > /var/log/user-data.log 2>&1
               export DEBIAN_FRONTEND=noninteractive
               
               # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
               apt-get update -qq
-              apt-get install -y -qq python3-pip
-              pip3 install awscli --break-system-packages --quiet
+              apt-get install -y -qq awscli
               
-              TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-              INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.monitoring_eip.id} --region ${var.aws_region} || true
+              TOKEN=$(curl -s --retry 3 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -s --retry 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+              
+              for i in 1 2 3 4 5; do
+                aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.monitoring_eip.id} --region ${var.aws_region} && break
+                echo "EIP association attempt $i failed, retrying in 5s..."
+                sleep 5
+              done
               
               sleep 5
               
