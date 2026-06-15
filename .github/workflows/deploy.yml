@@ -271,9 +271,8 @@ jobs:
             }
             EOF
             
-            # Fetch Monitoring Private IP dynamically for internal SG communication
-            MON_PRIVATE_IP=$(aws ec2 describe-addresses --public-ips ${{ env.MONITORING_PUBLIC_IP }} --query "Addresses[0].PrivateIpAddress" --output text --region us-east-1)
-            sed -i "s/__MONITORING_PRIVATE_IP__/$MON_PRIVATE_IP/g" /home/ubuntu/app/nginx-proxy.conf
+            # Set Monitoring IP dynamically for Nginx Proxy
+            sed -i "s/__MONITORING_PRIVATE_IP__/${{ env.MONITORING_PUBLIC_IP }}/g" /home/ubuntu/app/nginx-proxy.conf
             
             sudo cp /home/ubuntu/app/nginx-proxy.conf /etc/nginx/sites-available/roi-platform
             sudo ln -sf /etc/nginx/sites-available/roi-platform /etc/nginx/sites-enabled/
