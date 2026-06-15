@@ -24,7 +24,9 @@ services:
     container_name: roi_loki
     ports:
       - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
+    command: 
+      - '-config.file=/etc/loki/local-config.yaml'
+      - '-config.expand-env=true'
     volumes:
       - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml
       - loki_data:/loki
@@ -129,6 +131,9 @@ services:
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
+      - '--config.expand-env'
+    environment:
+      - SMTP_APP_PASSWORD=${SMTP_APP_PASSWORD}
     networks:
       - roi_network
 

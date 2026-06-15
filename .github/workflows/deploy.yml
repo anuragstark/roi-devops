@@ -131,6 +131,7 @@ jobs:
             echo "DB_NAME=roi_platform" >> .env
             echo "DASHBOARD_USER=${{ secrets.DASHBOARD_USER }}" >> .env
             echo "DASHBOARD_PASS=${{ secrets.DASHBOARD_PASS }}" >> .env
+            echo "SMTP_APP_PASSWORD=${{ secrets.SMTP_APP_PASSWORD }}" >> .env
             
             docker network create roi_global_network || true
             docker compose --env-file .env -f docker-compose.infra.yml up -d --build

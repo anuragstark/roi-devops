@@ -24,5 +24,4 @@ storage:
 metrics_generator:
   storage:
     path: /tmp/tempo/metrics
-  traces_storage:
-    path: /tmp/tempo/metrics/traces
+
