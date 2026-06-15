@@ -271,36 +271,40 @@ resource "aws_launch_template" "web_lt" {
 
   user_data = base64encode(<<-EOF
               #!/bin/bash
-              set -e
               export DEBIAN_FRONTEND=noninteractive
+              
+              # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
+              # Install only awscli via pip3 (Python3 is pre-installed on Ubuntu 24.04, fast ~20s)
               apt-get update -qq
+              apt-get install -y -qq python3-pip
+              pip3 install awscli --break-system-packages --quiet
+              
+              TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.roi_eip.id} --region ${var.aws_region} || true
+              
+              # Wait for IP to propagate
+              sleep 5
+              
+              # ── STEP 2: Install Docker (slow, but SSH already works via EIP above) ──
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
-              apt-get install -y docker-compose-plugin awscli jq
+              apt-get install -y docker-compose-plugin jq
               usermod -aG docker ubuntu
               systemctl enable docker
               systemctl start docker
               mkdir -p /home/ubuntu/app
               chown ubuntu:ubuntu /home/ubuntu/app
               
-              # Associate Elastic IP
-              TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-              INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
-              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.roi_eip.id} --region ${var.aws_region}
-              
-              # Wait 5 seconds for IP to propagate fully
-              sleep 5
-              
-              # Trigger GitHub Actions Webhook to Deploy Code
-              curl -L -X POST \
+              # ── STEP 3: Trigger GitHub Actions to deploy code ──
+              curl -s -L -X POST \
                 -H "Accept: application/vnd.github+json" \
                 -H "Authorization: Bearer ${var.gh_pat}" \
                 -H "X-GitHub-Api-Version: 2022-11-28" \
                 https://api.github.com/repos/anuragstark/roi-devops/actions/workflows/deploy.yml/dispatches \
-                -d '{"ref":"main"}'
+                -d '{"ref":"main"}' || true
               
-              echo "Waiting for code push..." > /home/ubuntu/app/STATUS.txt
-              echo "Setup completed successfully" > /home/ubuntu/setup-complete.txt
+              echo "Setup completed" > /home/ubuntu/setup-complete.txt
               EOF
   )
 
@@ -384,35 +388,38 @@ resource "aws_launch_template" "monitoring_lt" {
 
   user_data = base64encode(<<-EOF
               #!/bin/bash
-              set -e
               export DEBIAN_FRONTEND=noninteractive
+              
+              # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
               apt-get update -qq
+              apt-get install -y -qq python3-pip
+              pip3 install awscli --break-system-packages --quiet
+              
+              TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.monitoring_eip.id} --region ${var.aws_region} || true
+              
+              sleep 5
+              
+              # ── STEP 2: Install Docker ──
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
-              apt-get install -y docker-compose-plugin awscli jq
+              apt-get install -y docker-compose-plugin jq
               usermod -aG docker ubuntu
               systemctl enable docker
               systemctl start docker
               mkdir -p /home/ubuntu/app
               chown ubuntu:ubuntu /home/ubuntu/app
               
-              # Associate Elastic IP
-              TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-              INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
-              aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id ${aws_eip.monitoring_eip.id} --region ${var.aws_region}
-              
-              # Wait 5 seconds for IP to propagate fully
-              sleep 5
-              
-              # Trigger GitHub Actions Webhook to Deploy Code
-              curl -L -X POST \
+              # ── STEP 3: Trigger GitHub Actions to deploy code ──
+              curl -s -L -X POST \
                 -H "Accept: application/vnd.github+json" \
                 -H "Authorization: Bearer ${var.gh_pat}" \
                 -H "X-GitHub-Api-Version: 2022-11-28" \
                 https://api.github.com/repos/anuragstark/roi-devops/actions/workflows/deploy.yml/dispatches \
-                -d '{"ref":"main"}'
+                -d '{"ref":"main"}' || true
               
-              echo "Waiting for code push..." > /home/ubuntu/app/STATUS.txt
+              echo "Setup completed" > /home/ubuntu/setup-complete.txt
               EOF
   )
 
