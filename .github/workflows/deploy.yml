@@ -249,15 +249,15 @@ jobs:
               fi
             fi
 
-            # SSL Configuration (run in background so it doesn't break SSH session)
+            # SSL Configuration (fully detached from SSH so session can close)
             if ! grep -q "managed by Certbot" /etc/nginx/sites-available/roi-platform 2>/dev/null; then
-                nohup bash -c '
+                setsid bash -c '
                   export DEBIAN_FRONTEND=noninteractive
                   sudo apt-get update -qq
                   sudo apt-get install -y -qq certbot python3-certbot-nginx
                   sudo certbot --nginx --non-interactive --agree-tos -m admin@paisatest.online -d paisatest.online -d www.paisatest.online -d grafana.paisatest.online -d prometheus.paisatest.online --redirect || true
-                ' > /home/ubuntu/certbot.log 2>&1 &
+                ' > /home/ubuntu/certbot.log 2>&1 < /dev/null &
+                disown -a
             fi
             
             echo "Deployment complete!"
-            sleep 2
