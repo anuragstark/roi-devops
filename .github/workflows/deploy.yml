@@ -91,6 +91,8 @@ jobs:
           host: ${{ env.MONITORING_PUBLIC_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30m
+          command_timeout: 30m
           script: |
             set -e
             mkdir -p /home/ubuntu/app
@@ -126,6 +128,8 @@ jobs:
           host: ${{ env.WEB_PUBLIC_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30m
+          command_timeout: 30m
           script: |
             set -e
             export DEBIAN_FRONTEND=noninteractive
