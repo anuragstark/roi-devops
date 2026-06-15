@@ -276,7 +276,10 @@ resource "aws_launch_template" "web_lt" {
               
               # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
               apt-get update -qq
-              apt-get install -y -qq awscli
+              apt-get install -y -qq unzip curl
+              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              ./aws/install
               
               TOKEN=$(curl -s --retry 3 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
               INSTANCE_ID=$(curl -s --retry 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
@@ -360,12 +363,6 @@ resource "aws_autoscaling_group" "web_asg" {
     }
   }
 
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 0
-    }
-  }
 
   tag {
     key                 = "Name"
@@ -397,7 +394,10 @@ resource "aws_launch_template" "monitoring_lt" {
               
               # ── STEP 1: Attach Elastic IP FIRST (so SSH is reachable fast) ──
               apt-get update -qq
-              apt-get install -y -qq awscli
+              apt-get install -y -qq unzip curl
+              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              ./aws/install
               
               TOKEN=$(curl -s --retry 3 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
               INSTANCE_ID=$(curl -s --retry 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
@@ -480,12 +480,6 @@ resource "aws_autoscaling_group" "monitoring_asg" {
     }
   }
 
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 0
-    }
-  }
 
   tag {
     key                 = "Name"
