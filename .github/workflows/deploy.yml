@@ -244,32 +244,32 @@ jobs:
             # Inject Monitoring Subdomains
             cat << 'EOF' >> /home/ubuntu/app/nginx-proxy.conf
 
-server {
-    listen 80;
-    server_name grafana.paisatest.online;
-    location / {
-        proxy_pass http://__MONITORING_PRIVATE_IP__:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+            server {
+                listen 80;
+                server_name grafana.paisatest.online;
+                location / {
+                    proxy_pass http://__MONITORING_PRIVATE_IP__:3001;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
 
-server {
-    listen 80;
-    server_name prometheus.paisatest.online;
-    location / {
-        auth_basic "Prometheus Restricted Area";
-        auth_basic_user_file /etc/nginx/.htpasswd;
-        proxy_pass http://__MONITORING_PRIVATE_IP__:9090;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+            server {
+                listen 80;
+                server_name prometheus.paisatest.online;
+                location / {
+                    auth_basic "Prometheus Restricted Area";
+                    auth_basic_user_file /etc/nginx/.htpasswd;
+                    proxy_pass http://__MONITORING_PRIVATE_IP__:9090;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            EOF
             
             # Fetch Monitoring Private IP dynamically for internal SG communication
             MON_PRIVATE_IP=$(aws ec2 describe-addresses --public-ips ${{ env.MONITORING_PUBLIC_IP }} --query "Addresses[0].PrivateIpAddress" --output text --region us-east-1)
