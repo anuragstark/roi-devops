@@ -8,11 +8,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "roi-platform-tf-state-974387"
-    key            = "ec2/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "roi-platform-tf-locks"
-    encrypt        = true
+    bucket       = "roi-platform-tf-state-974387"
+    key          = "ec2/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 

@@ -31,16 +31,7 @@ jobs:
         working-directory: ./infra/terraform
         run: terraform init
 
-      # --- 2. CLEAR STALE TERRAFORM LOCK (if any) ---
-      - name: Clear stale Terraform state lock
-        run: |
-          aws dynamodb delete-item \
-            --table-name roi-platform-tf-locks \
-            --key '{"LockID": {"S": "roi-platform-tf-state-974387/ec2/terraform.tfstate"}}' \
-            --region us-east-1 || true
-          echo "Lock cleared (or was already clear)"
-
-      # --- 3. PROVISION INFRASTRUCTURE ---
+      # --- 2. PROVISION INFRASTRUCTURE ---
       - name: Terraform Apply
         working-directory: ./infra/terraform
         run: terraform apply -auto-approve -no-color
