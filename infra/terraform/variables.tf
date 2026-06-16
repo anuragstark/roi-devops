@@ -7,8 +7,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  # default     = "t3.medium" # 4GB RAM for Docker builds
-  default     = "t3.small" # 2GB RAM (optimized for cost, adequate for deployment)
+  default     = "t3.small" # 2GB RAM (used for Spot Instance launch template)
 }
 
 variable "db_username" {
@@ -35,18 +34,7 @@ variable "environment" {
   default     = "production"
 }
 
-variable "github_repo" {
-  description = "GitHub repository URL"
-  type        = string
-  # default     = "https://github.com/your-username/roi"
-  default     = "https://github.com/anuragstark/Roi-project.git"
-}
 
-variable "github_branch" {
-  description = "GitHub branch to deploy"
-  type        = string
-  default     = "main"
-}
 
 variable "project_name" {
   description = "Project identifier used in resource naming"

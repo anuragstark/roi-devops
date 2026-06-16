@@ -1,235 +1,135 @@
 # AWS Deployment Guide - ROI Investment Platform
 
-Quick guide to deploy your ROI platform on AWS EC2 with Docker.
+This guide covers the advanced, automated deployment architecture for the ROI Platform on AWS. The infrastructure is entirely managed by Terraform and GitHub Actions, featuring a highly-available Blue/Green deployment strategy and comprehensive monitoring using Grafana and Prometheus.
+
+## Architecture Overview
+
+- **Web Server**: Runs the Next.js Frontend and Express Backend (via Docker Compose). Uses Blue/Green deployment for zero-downtime updates.
+- **Monitoring Server**: Runs Prometheus, Loki, Tempo, Alertmanager, and Grafana.
+- **Database**: AWS RDS MySQL instance (Free Tier eligible).
+- **Cost Optimization**: Both the Web and Monitoring servers are deployed as **EC2 Spot Instances** within Auto Scaling Groups (ASGs). This provides ~70% cost savings compared to On-Demand instances.
+- **Secrets Management**: Environment variables are encrypted using Mozilla SOPS and AWS KMS/Age, and stored safely inside the repository.
+
+---
 
 ## Prerequisites
 
 - AWS Account
-- AWS CLI installed (optional but helpful)
+- AWS CLI installed and configured
 - Terraform installed (`brew install terraform` on Mac)
-- SSH key pair created in AWS
+- SOPS & Age installed for managing encrypted secrets
+- An SSH key pair named `roi-platform-key` created in AWS (save the `.pem` file to `~/.ssh/`)
 
-## Step 1: Create SSH Key Pair in AWS
+---
 
-1. Go to AWS Console → EC2 → Key Pairs
-2. Click "Create key pair"
-3. Name: `roi-platform-key`
-4. Type: RSA
-5. Format: `.pem`
-6. Save the downloaded file to `~/.ssh/roi-platform-key.pem`
-7. Set permissions: `chmod 400 ~/.ssh/roi-platform-key.pem`
+## Step 1: Managing Encrypted Secrets (SOPS)
 
-## Step 2: Configure Terraform
+We do not store plain-text `.env` files. Instead, we use Mozilla SOPS to encrypt the `.env` file before committing it.
 
+1. Ensure you have the `SOPS_AGE_KEY` secret.
+2. Edit your environment variables:
+   ```bash
+   # Decrypt the file for editing
+   sops -d .env.enc > .env
+   
+   # ... Edit .env file ...
+   
+   # Encrypt the file back to .env.enc
+   sops -e .env > .env.enc
+   ```
+3. Commit the updated `.env.enc` to the repository.
+
+---
+
+## Step 2: Configure & Deploy Infrastructure (Terraform)
+
+All AWS infrastructure is provisioned through Terraform.
+
+1. **Navigate to the Terraform directory:**
+   ```bash
+   cd infra/terraform
+   ```
+
+2. **Initialize Terraform:**
+   This project uses an **S3 backend** for state storage and a **DynamoDB table** for state locking.
+   ```bash
+   terraform init
+   ```
+
+3. **Configure Variables:**
+   Ensure `terraform.tfvars` contains your specific configuration:
+   ```hcl
+   key_pair_name = "roi-platform-key"
+   aws_region    = "us-east-1"
+   # ... other variables ...
+   ```
+   *Note: Sensitive variables (like `db_password` and `gh_pat`) should be passed via environment variables (e.g., `TF_VAR_db_password`).*
+
+4. **Deploy Infrastructure:**
+   ```bash
+   terraform apply
+   ```
+   *Terraform will automatically assign Elastic IPs and trigger the initial application deployment via GitHub Actions webhooks using your `gh_pat`.*
+
+---
+
+## Step 3: Application Deployment (GitHub Actions)
+
+Once the infrastructure is up, application deployments are fully automated.
+
+1. Push your code to the `main` branch.
+2. The **"Terraform Apply & Blue/Green Deploy"** workflow will trigger.
+3. **The Workflow will:**
+   - Verify Terraform drift.
+   - SSH into the Web Server.
+   - Decrypt the `.env.enc` file using SOPS.
+   - Run the Blue/Green deployment script.
+   - Start the new Docker containers on a new port.
+   - Update Nginx to point to the new containers seamlessly.
+   - Configure Certbot to secure the connections with SSL.
+
+### Accessing the Platform
+After deployment, the following domains will be secured with HTTPS:
+- **Frontend**: `https://paisatest.online`
+- **Grafana Dashboard**: `https://grafana.paisatest.online`
+- **Prometheus**: `https://prometheus.paisatest.online`
+
+---
+
+## Troubleshooting & Maintenance
+
+### Spot Instance Replacements
+Because we use Spot Instances to save costs, AWS might occasionally terminate an instance if capacity drops.
+- Our **Auto Scaling Group** is configured to instantly spin up a replacement instance (`t3.small`).
+- The `user_data` startup script automatically re-attaches the existing Elastic IP.
+- The startup script then sends a webhook to GitHub Actions, which automatically redeploys your Docker containers without any manual intervention.
+
+### Connecting to Servers
 ```bash
-cd infra/terraform
+# Connect to the Web Server
+ssh -i ~/.ssh/roi-platform-key.pem ubuntu@<WEB_PUBLIC_IP>
 
-# Copy example variables
-cp terraform.tfvars.example terraform.tfvars
-
-# Edit variables (update your settings)
-nano terraform.tfvars
+# Connect to the Monitoring Server
+ssh -i ~/.ssh/roi-platform-key.pem ubuntu@<MONITORING_PUBLIC_IP>
 ```
 
-Update `terraform.tfvars`:
-```hcl
-key_pair_name = "roi-platform-key"
-aws_region    = "us-east-1"
-github_repo   = "https://github.com/YOUR_USERNAME/roi"
-```
-
-## Step 3: Deploy Infrastructure
-
+### Checking Logs
+On the Web Server:
 ```bash
-# Initialize Terraform
-terraform init
-
-# Preview changes
-terraform plan
-
-# Apply changes (creates EC2 instance)
-terraform apply
-```
-
-**Save the outputs!** You'll see:
-- Public IP address
-- Frontend URL
-- Backend URL
-- SSH command
-
-## Step 4: Initial Server Setup
-
-```bash
-# SSH into your server (replace IP)
-ssh -i ~/.ssh/roi-platform-key.pem ubuntu@YOUR_PUBLIC_IP
-
-# Wait for Docker installation (check status)
-cat /home/ubuntu/setup-complete.txt
-
-# If Docker is installed, verify
-docker --version
-docker compose version
-
-# Create app directory and clone repo
 cd /home/ubuntu/app
-git clone https://github.com/YOUR_USERNAME/roi.git .
-
-# Create production environment file from template (root)
-cp .env.production.example .env
-nano .env
+docker compose logs -f frontend
+docker compose logs -f backend
 ```
+*Note: All application logs are automatically shipped to Loki and can be viewed beautifully in the Grafana dashboard.*
 
-Copy content from `.env.production.example` (project root) and update:
-- `APP_BASE_URL` / `APP_WEB_ORIGIN` (e.g., `https://your-domain.com`)
-- `VITE_API_URL` (e.g., `https://api.your-domain.com/api`)
-- `DATABASE_URL` (point to RDS or container DB)
-- JWT secrets and admin credentials
+---
 
-## Step 5: Deploy Application
+## Destroying Infrastructure
 
-```bash
-# Make deploy script executable
-chmod +x infra/scripts/deploy.sh
+When you are done testing, you can tear everything down to stop incurring costs.
 
-# Run deployment
-bash infra/scripts/deploy.sh
-```
+1. Go to the **Actions** tab in GitHub.
+2. Select the **3. Destroy Infrastructure** workflow.
+3. Click **Run workflow**.
 
-Wait for containers to start. You should see:
-- ✅ MySQL container running
-- ✅ Backend container running  
-- ✅ Frontend container running
-
-## Step 6: Access Your Application
-
-Open in browser:
-- **Frontend**: value from `APP_BASE_URL`
-- **Backend API**: `${VITE_API_URL}/health` (or configured health endpoint)
-
-Login with admin credentials from `.env` file.
-
-## Step 7: Setup GitHub Actions (Auto-Deploy)
-
-1. Go to GitHub → Your Repository → Settings → Secrets and variables → Actions
-
-2. Add these secrets:
-   - `EC2_HOST`: Your public IP address
-   - `EC2_USER`: `ubuntu`
-   - `EC2_SSH_KEY`: Content of your `.pem` file
-
-3. Push to main branch - deployment happens automatically!
-
-```bash
-git add .
-git commit -m "Deploy to AWS"
-git push origin main
-```
-
-Check GitHub Actions tab to see deployment progress.
-
-## Useful Commands
-
-### On Your Local Machine
-```bash
-# SSH into server
-ssh -i ~/.ssh/roi-platform-key.pem ubuntu@YOUR_IP
-
-# Destroy infrastructure (when done testing)
-cd infra/terraform
-terraform destroy
-```
-
-### On EC2 Server
-```bash
-# View logs
-docker compose logs -f
-
-# Restart containers
-docker compose restart
-
-# Stop all
-docker compose down
-
-# Start all
-docker compose up -d
-
-# Check container status
-docker compose ps
-
-# Manual redeploy
-cd /home/ubuntu/app
-bash infra/scripts/deploy.sh
-```
-
-## Troubleshooting
-
-### Can't connect to frontend
-```bash
-# Check if container is running
-docker compose ps
-
-# Check frontend logs
-docker compose logs frontend
-
-# Verify port is open
-curl ${APP_BASE_URL:-http://localhost:3000}
-```
-
-### Backend API not responding
-```bash
-# Check backend logs
-docker compose logs backend
-
-# Check database connection
-docker compose logs mysql
-
-# Restart backend
-docker compose restart backend
-```
-
-### Database connection errors
-```bash
-# Check MySQL is healthy
-docker compose ps mysql
-
-# Check MySQL logs
-docker compose logs mysql
-
-# Verify environment variables
-cat .env
-```
-
-### GitHub Actions failing
-1. Verify GitHub secrets are correct
-2. Check EC2 security group allows SSH (port 22)
-3. Verify SSH key has correct permissions on EC2
-
-## Cost Optimization
-
-This setup uses:
-- **t3.micro** instance (~$7.50/month or FREE on free tier)
-- **20 GB storage** (included)
-- **Elastic IP** (FREE when attached)
-
-**Total: $0-10/month**
-
-To minimize costs:
-- Stop instance when not in use: `terraform destroy`
-- Use AWS Free Tier (12 months free for new accounts)
-
-## Next Steps
-
-- [ ] Setup domain name and point to EC2 IP
-- [ ] Configure nginx reverse proxy for cleaner URLs
-- [ ] Setup SSL certificate (Let's Encrypt)
-- [ ] Configure automated backups for database
-- [ ] Setup CloudWatch monitoring
-- [ ] Configure auto-scaling (for production)
-
-## Support
-
-If you encounter issues:
-1. Check container logs: `docker compose logs`
-2. Verify `.env` file has correct values
-3. Ensure ports 3000 and 5000 are open in security group
-4. Check GitHub Actions logs for deployment errors
+**IMPORTANT:** Destroying the infrastructure will release your Elastic IPs back to AWS. The next time you deploy, AWS will assign you **new** public IPs. You MUST update your DNS provider (e.g., Hostinger) with the new IPs before the Certbot step runs, otherwise SSL generation will fail!

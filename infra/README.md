@@ -1,125 +1,67 @@
 # ROI Platform Infrastructure
 
-Infrastructure as Code (IaC) for deploying the ROI Investment Platform on AWS.
+Infrastructure as Code (IaC) for deploying the ROI Investment Platform on AWS. This repository manages the AWS resources and CI/CD pipelines required to run a highly available, cost-optimized environment.
 
-## Quick Start
+## Architecture Highlights
 
-### Deploy to AWS (Recommended for Testing)
-
-1. **Install Terraform**
-   ```bash
-   brew install terraform  # Mac
-   # or download from https://www.terraform.io/downloads
-   ```
-
-2. **Create AWS Key Pair**
-   - AWS Console → EC2 → Key Pairs → Create
-   - Name: `roi-platform-key`
-   - Save `.pem` file to `~/.ssh/`
-
-3. **Configure & Deploy**
-   ```bash
-   cd terraform
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your settings
-   terraform init
-   terraform apply
-   ```
-
-4. **Setup Application**
-   - SSH into EC2: `ssh -i ~/.ssh/roi-platform-key.pem ubuntu@YOUR_IP`
-   - Clone repo: `git clone <your-repo> /home/ubuntu/app`
-   - Create `.env` from project root `.env.production.example` (set APP_BASE_URL/APP_WEB_ORIGIN/VITE_API_URL/DATABASE_URL/JWT secrets)
-   - Deploy: `bash infra/scripts/deploy.sh`
-
-5. **Access Application**
-- Frontend: `${APP_BASE_URL}`
-- Backend: `${VITE_API_URL}`
-
-📖 **Full Guide**: See [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)
-
-## Infrastructure Components
-
-### Terraform (AWS)
-- **EC2 Instance**: t3.micro (Free Tier eligible)
-- **Security Group**: Ports 22, 80, 443, 3000, 5000
-- **Elastic IP**: Static public IP address
-- **Auto-setup**: Docker installation via user data
-
-### Docker Containers
-- **MySQL**: Database (port 3306)
-- **Backend**: Node.js API (port 5000)
-- **Frontend**: React app (port 3000)
-
-### CI/CD
-- **GitHub Actions**: Auto-deploy on push to main
-- **Workflow**: `.github/workflows/deploy-to-aws.yml`
+- **Terraform (AWS)**: Provisions the entire infrastructure, utilizing an S3 backend for state storage and DynamoDB for state locking.
+- **Spot Instances & Auto Scaling**: Uses `t3.small` Spot Instances within Auto Scaling Groups to provide ~70% cost savings. If AWS reclaims an instance, a new one is automatically spun up and configured.
+- **Blue/Green Deployments**: Zero-downtime deployments via GitHub Actions (`deploy.yml`). New containers are spun up and verified before Nginx routes traffic to them.
+- **Monitoring Stack**: A dedicated server runs Prometheus, Loki, Tempo, Alertmanager, and Grafana. It scrapes metrics from the Web Server entirely within the AWS private network.
+- **Secrets Management**: Environment variables are encrypted securely in the repository using Mozilla SOPS and AWS KMS/Age.
 
 ## Directory Structure
 
 ```
 infra/
 ├── terraform/              # Terraform configuration
-│   ├── main.tf            # Main infrastructure
-│   ├── variables.tf       # Input variables
-│   ├── outputs.tf         # Output values
-│   └── terraform.tfvars.example
-├── scripts/               # Deployment scripts
-│   └── deploy.sh         # Auto-deployment script
-├── AWS_DEPLOYMENT.md      # Detailed guide
-└── README.md             # This file
+│   ├── main.tf             # Main infrastructure (ASGs, Security Groups, EC2)
+│   ├── variables.tf        # Input variables
+│   ├── outputs.tf          # Output values (IPs, URLs)
+│   └── s3.tf               # Upload buckets and CORS rules
+├── AWS_DEPLOYMENT.md       # Detailed deployment guide
+└── README.md               # This file
 ```
+
+## Quick Start
+
+### 1. Prerequisites
+- AWS CLI configured
+- Terraform installed
+- Mozilla SOPS and Age installed
+- SSH Key Pair (`roi-platform-key.pem`) saved to `~/.ssh/`
+
+### 2. Infrastructure Deployment
+All infrastructure is provisioned through Terraform.
+
+```bash
+cd terraform
+terraform init
+terraform apply
+```
+
+### 3. Application Deployment
+Application deployments are handled automatically by **GitHub Actions**.
+Simply push your code to the `main` branch, and the workflow will:
+1. Detect any Terraform drift.
+2. SSH into the servers.
+3. Perform a Blue/Green Docker deployment.
+4. Issue Let's Encrypt SSL certificates automatically.
+
+## Documentation
+
+For a comprehensive breakdown of the deployment process, Secrets Management, and Troubleshooting, please refer to the [AWS Deployment Guide](./AWS_DEPLOYMENT.md).
 
 ## Cost Estimate
 
-**Monthly Cost**: $0 - $10
+By utilizing Spot Instances, we've optimized the infrastructure to be incredibly cost-effective:
 
-- t3.micro instance: **FREE** (1st year) or ~$7.50/month
-- 20 GB storage: **FREE** (included in free tier)
-- Elastic IP: **FREE** (when attached)
-- Data transfer: **FREE** (1 GB/month)
+- **Web Server (Spot `t3.small`)**: ~$0.0063/hr
+- **Monitoring Server (Spot `t3.small`)**: ~$0.0063/hr
+- **RDS MySQL**: FREE (on AWS Free Tier) or ~$12/month
+- **Elastic IPs**: ~$7/month (AWS flat fee for public IPv4)
+- **Total Estimated Cost**: **~$20 - $35 per month**
 
-## GitHub Actions Setup
+## Clean Up
 
-Add these secrets to your GitHub repository (Settings → Secrets):
-
-| Secret | Value |
-|--------|-------|
-| `EC2_HOST` | Your EC2 public IP |
-| `EC2_USER` | `ubuntu` |
-| `EC2_SSH_KEY` | Content of your `.pem` file |
-
-Then push to main branch - automatic deployment! 🚀
-
-## Useful Commands
-
-```bash
-# Deploy infrastructure
-cd terraform && terraform apply
-
-# Check deployment status
-ssh ubuntu@YOUR_IP 'docker compose ps'
-
-# View application logs
-ssh ubuntu@YOUR_IP 'cd /home/ubuntu/app && docker compose logs -f'
-
-# Manual deployment
-ssh ubuntu@YOUR_IP 'cd /home/ubuntu/app && bash infra/scripts/deploy.sh'
-
-# Destroy infrastructure
-cd terraform && terraform destroy
-```
-
-## Support
-
-- 📖 [AWS Deployment Guide](./AWS_DEPLOYMENT.md)
-- 🐛 Check logs: `docker compose logs`
-- 💬 GitHub Issues
-
-## Next Steps
-
-- [ ] Setup custom domain
-- [ ] Configure SSL/HTTPS
-- [ ] Setup database backups
-- [ ] Configure monitoring
-- [ ] Setup staging environment
+When you are finished testing, use the **3. Destroy Infrastructure** GitHub Action to safely tear down the entire environment and stop incurring costs.
