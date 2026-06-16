@@ -116,7 +116,9 @@ jobs:
             # Clone/Pull repository
             if [ ! -d ".git" ]; then
                 git init
-                git remote add origin https://${{ secrets.GH_PAT }}@github.com/anuragstark/Roi-project.git
+                git remote add origin https://${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+            else
+                git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
             fi
             git fetch origin main
             git reset --hard origin/main
@@ -181,7 +183,9 @@ jobs:
             # Clone/Pull repository
             if [ ! -d ".git" ]; then
                 git init
-                git remote add origin https://${{ secrets.GH_PAT }}@github.com/anuragstark/Roi-project.git
+                git remote add origin https://${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+            else
+                git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
             fi
             git fetch origin main
             git reset --hard origin/main

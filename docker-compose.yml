@@ -86,6 +86,8 @@ services:
     image: prom/node-exporter:v1.8.1
     container_name: roi_node_exporter
     restart: unless-stopped
+    ports:
+      - "9100:9100"
     pid: host
     volumes:
       - /proc:/host/proc:ro

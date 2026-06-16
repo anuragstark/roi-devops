@@ -158,8 +158,8 @@ resource "aws_security_group_rule" "monitoring_to_web_9100" {
   to_port                  = 9100
   protocol                 = "tcp"
   security_group_id        = aws_security_group.web_sg.id
-  source_security_group_id = aws_security_group.monitoring_sg.id
-  description              = "Allow Monitoring SG to scrape Node Exporter"
+  cidr_blocks              = [data.aws_vpc.default.cidr_block]
+  description              = "Allow VPC to scrape Node Exporter"
 }
 
 resource "aws_security_group_rule" "monitoring_to_web_8080" {
@@ -168,8 +168,8 @@ resource "aws_security_group_rule" "monitoring_to_web_8080" {
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.web_sg.id
-  source_security_group_id = aws_security_group.monitoring_sg.id
-  description              = "Allow Monitoring SG to scrape cAdvisor"
+  cidr_blocks              = [data.aws_vpc.default.cidr_block]
+  description              = "Allow VPC to scrape cAdvisor"
 }
 
 data "aws_vpc" "default" {
