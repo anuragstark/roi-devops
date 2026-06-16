@@ -2,7 +2,7 @@
 
 This repository contains the advanced Infrastructure as Code (IaC), CI/CD pipelines, container orchestration, and observability stack for the ROI Investment Platform. 
 
-> **Note:** The core application source code (backend APIs, frontend UI) is kept in a separate private repository for security reasons. This repository serves as a showcase of the DevOps and Platform Engineering architecture used to host the platform securely, cost-effectively, and with zero downtime.
+> **Note:** The core application source code (backend APIs, frontend UI) is kept in a separate private repository for security reasons. This repository demonstrates the DevOps and Platform Engineering architecture used to host the platform securely, cost-effectively, and with zero downtime.
 
 ## 🏗 Architecture & DevOps Stack
 
@@ -31,3 +31,7 @@ This repository contains the advanced Infrastructure as Code (IaC), CI/CD pipeli
 - **Automated SSL/TLS**: The deployment pipeline automatically triggers `certbot` to issue and renew Let's Encrypt certificates for all domains (`paisatest.online`, `grafana.paisatest.online`, `prometheus.paisatest.online`).
 - **Internal VPC Routing**: The Nginx reverse proxy dynamically fetches the Monitoring Server's Private IP, ensuring that metrics and dashboards are routed securely through the internal AWS network via strict Security Groups.
 - **Encrypted State**: Terraform state files are encrypted at rest in S3, and environment variables are strictly decrypted at runtime during the CI/CD pipeline execution using SOPS.
+
+---
+
+**Developed by**: [Anurag Stark](https://www.linkedin.com/in/anuragstark/)
