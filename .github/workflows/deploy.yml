@@ -176,6 +176,10 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            # Authenticate to GHCR
+            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u anuragstark --password-stdin
+            export IMAGE_TAG="${{ github.event.client_payload.image_tag }}"
+
             # SOPS Decryption
             echo "${{ secrets.SOPS_AGE_KEY }}" > /home/ubuntu/key.txt
             export SOPS_AGE_KEY_FILE=/home/ubuntu/key.txt
@@ -220,9 +224,8 @@ jobs:
 
             export COMPOSE_PROJECT_NAME="roi_$IDLE_ENV"
             
-            # Build sequentially to prevent massive memory spikes
-            docker compose --env-file .env -f docker-compose.yml build backend roi-cron
-            docker compose --env-file .env -f docker-compose.yml build frontend
+            # Pull pre-compiled images from GHCR
+            docker compose --env-file .env -f docker-compose.yml pull
             docker compose --env-file .env -f docker-compose.yml up -d
             
             # Health checks
