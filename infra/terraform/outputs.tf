@@ -8,6 +8,11 @@ output "monitoring_public_ip" {
   value       = aws_eip.monitoring_eip.public_ip
 }
 
+output "monitoring_private_ip" {
+  description = "Private IP address of the Monitoring Server"
+  value       = aws_eip.monitoring_eip.private_ip
+}
+
 output "frontend_url" {
   description = "Frontend application URL"
   value       = "http://${aws_eip.roi_eip.public_ip}:3000"
