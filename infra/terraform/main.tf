@@ -127,8 +127,8 @@ resource "aws_security_group_rule" "web_to_monitoring_3001" {
   to_port                  = 3001
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
-  description              = "Allow Web EIP to access Grafana"
+  source_security_group_id = aws_security_group.web_sg.id
+  description              = "Allow Web SG to access Grafana"
 }
 
 resource "aws_security_group_rule" "web_to_monitoring_9090" {
@@ -137,8 +137,8 @@ resource "aws_security_group_rule" "web_to_monitoring_9090" {
   to_port                  = 9090
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
-  description              = "Allow Web EIP to access Prometheus"
+  source_security_group_id = aws_security_group.web_sg.id
+  description              = "Allow Web SG to access Prometheus"
 }
 
 resource "aws_security_group_rule" "web_to_monitoring_9093" {
@@ -147,8 +147,8 @@ resource "aws_security_group_rule" "web_to_monitoring_9093" {
   to_port                  = 9093
   protocol                 = "tcp"
   security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = ["${aws_eip.roi_eip.public_ip}/32"]
-  description              = "Allow Web EIP to access Alertmanager"
+  source_security_group_id = aws_security_group.web_sg.id
+  description              = "Allow Web SG to access Alertmanager"
 }
 
 # Monitoring -> Web (Prometheus scraping Node Exporter and cAdvisor)
