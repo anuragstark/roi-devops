@@ -253,6 +253,36 @@ jobs:
             # Nginx & htpasswd Setup
             sudo apt-get install -y nginx apache2-utils > /dev/null 2>&1 || true
             sudo htpasswd -b -c /etc/nginx/.htpasswd "${{ secrets.DASHBOARD_USER }}" "${{ secrets.DASHBOARD_PASS }}"
+            
+            # Inject Monitoring Subdomains
+            cat << 'EOF' >> /home/ubuntu/app/nginx-proxy.conf
+
+            server {
+                listen 80;
+                server_name grafana.paisatest.online;
+                location / {
+                    proxy_pass http://__MONITORING_PRIVATE_IP__:3001;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+
+            server {
+                listen 80;
+                server_name prometheus.paisatest.online;
+                location / {
+                    auth_basic "Prometheus Restricted Area";
+                    auth_basic_user_file /etc/nginx/.htpasswd;
+                    proxy_pass http://__MONITORING_PRIVATE_IP__:9090;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            EOF
 
             
             # Set Monitoring IP dynamically for Nginx Proxy (USING PRIVATE IP FOR VPC ROUTING)
@@ -260,7 +290,12 @@ jobs:
             
             sudo cp /home/ubuntu/app/nginx-proxy.conf /etc/nginx/sites-available/roi-platform
             sudo ln -sf /etc/nginx/sites-available/roi-platform /etc/nginx/sites-enabled/
-            sudo rm -f /etc/nginx/sites-enabled/default
+            
+            # Restore SSL Certificates (Because git reset wipes the SSL configuration)
+            sudo certbot install --cert-name paisatest.online --nginx -n || true
+            
+            sudo nginx -t
+            sudo systemctl reload nginx
             
             sudo sed -i -E "s|proxy_pass http://127.0.0.1:3[0-9]+;|proxy_pass http://127.0.0.1:$FRONTEND_PORT;|g" /etc/nginx/sites-available/roi-platform
             sudo sed -i -E "s|proxy_pass http://127.0.0.1:5[0-9]+;|proxy_pass http://127.0.0.1:$BACKEND_PORT;|g" /etc/nginx/sites-available/roi-platform
