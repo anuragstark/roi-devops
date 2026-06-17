@@ -49,6 +49,23 @@ jobs:
           echo "MONITORING_PUBLIC_IP=$(terraform output -raw monitoring_public_ip)" >> $GITHUB_ENV
           echo "MONITORING_PRIVATE_IP=$(terraform output -raw monitoring_private_ip)" >> $GITHUB_ENV
           echo "RDS_ENDPOINT=$(terraform output -raw rds_endpoint)" >> $GITHUB_ENV
+          echo "WEB_SG_ID=$(terraform output -raw web_sg_id)" >> $GITHUB_ENV
+          echo "MONITORING_SG_ID=$(terraform output -raw monitoring_sg_id)" >> $GITHUB_ENV
+
+      # --- 3.5. ENSURE SG RULES (belt-and-suspenders after Terraform) ---
+      - name: Ensure Cross-Communication SG Rules
+        run: |
+          VPC_CIDR="172.31.0.0/16"
+          # Monitoring SG: Allow VPC access to Grafana, Prometheus, Alertmanager, Node Exporter
+          for PORT in 3001 9090 9093 9100; do
+            aws ec2 authorize-security-group-ingress --group-id ${{ env.MONITORING_SG_ID }} \
+              --protocol tcp --port $PORT --cidr $VPC_CIDR 2>/dev/null || true
+          done
+          # Web SG: Allow VPC to scrape Node Exporter, cAdvisor, Backend (blue/green)
+          for PORT in 9100 8080 5000 5002; do
+            aws ec2 authorize-security-group-ingress --group-id ${{ env.WEB_SG_ID }} \
+              --protocol tcp --port $PORT --cidr $VPC_CIDR 2>/dev/null || true
+          done
 
       # --- 4. WAIT FOR EC2 TO BOOT ---
       - name: Wait for EC2 SSH to initialize

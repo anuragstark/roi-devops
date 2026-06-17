@@ -50,3 +50,12 @@ output "uploads_bucket_arn" {
   value       = aws_s3_bucket.uploads.arn
 }
 
+output "web_sg_id" {
+  description = "Security Group ID for Web Server"
+  value       = aws_security_group.web_sg.id
+}
+
+output "monitoring_sg_id" {
+  description = "Security Group ID for Monitoring Server"
+  value       = aws_security_group.monitoring_sg.id
+}
