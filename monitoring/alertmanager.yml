@@ -23,7 +23,7 @@ receivers:
         from: 'anuragchauhan536@gmail.com'
         smarthost: 'smtp.gmail.com:587'
         auth_username: 'anuragchauhan536@gmail.com'
-        auth_password: '${SMTP_APP_PASSWORD}'
+        auth_password_file: '/etc/alertmanager/smtp_password'
         require_tls: true
         send_resolved: true
 

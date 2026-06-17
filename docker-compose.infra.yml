@@ -136,10 +136,12 @@ services:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
       - "9093:9093"
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--config.expand-env'
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "$${SMTP_APP_PASSWORD}" > /etc/alertmanager/smtp_password
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
     environment:
       - SMTP_APP_PASSWORD=${SMTP_APP_PASSWORD}
     networks:
