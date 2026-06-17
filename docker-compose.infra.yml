@@ -147,10 +147,23 @@ services:
 
   # Tracing
 
+  tempo-init:
+    image: alpine:3.20
+    container_name: roi_tempo_init
+    entrypoint: ["sh", "-c", "chown -R 10001:10001 /tmp/tempo"]
+    volumes:
+      - tempo_data:/tmp/tempo
+    restart: "no"
+    networks:
+      - roi_network
+
   tempo:
     image: grafana/tempo:latest
     container_name: roi_tempo
     restart: unless-stopped
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./monitoring/tempo-config.yml:/etc/tempo.yaml:ro
