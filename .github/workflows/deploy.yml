@@ -238,6 +238,9 @@ jobs:
 
             export COMPOSE_PROJECT_NAME="roi_$IDLE_ENV"
             
+            # Remove containers with hardcoded names to prevent conflicts during blue/green swap
+            docker rm -f roi_cadvisor roi_node_exporter 2>/dev/null || true
+            
             # Pull pre-compiled images from GHCR
             docker compose --env-file .env -f docker-compose.yml pull
             docker compose --env-file .env -f docker-compose.yml up -d
