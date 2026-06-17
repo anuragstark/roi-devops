@@ -258,37 +258,6 @@ jobs:
             sudo apt-get install -y nginx apache2-utils > /dev/null 2>&1 || true
             sudo htpasswd -b -c /etc/nginx/.htpasswd "${{ secrets.DASHBOARD_USER }}" "${{ secrets.DASHBOARD_PASS }}"
             
-            # Inject Monitoring Subdomains
-            cat << 'EOF' >> /home/ubuntu/app/nginx-proxy.conf
-
-            server {
-                listen 80;
-                server_name grafana.paisatest.online;
-                location / {
-                    proxy_pass http://__MONITORING_PRIVATE_IP__:3001;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                }
-            }
-
-            server {
-                listen 80;
-                server_name prometheus.paisatest.online;
-                location / {
-                    auth_basic "Prometheus Restricted Area";
-                    auth_basic_user_file /etc/nginx/.htpasswd;
-                    proxy_pass http://__MONITORING_PRIVATE_IP__:9090;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                }
-            }
-            EOF
-
-            
             # Set Monitoring IP dynamically for Nginx Proxy (USING PRIVATE IP FOR VPC ROUTING)
             sed -i "s/__MONITORING_PRIVATE_IP__/${{ env.MONITORING_PRIVATE_IP }}/g" /home/ubuntu/app/nginx-proxy.conf
             

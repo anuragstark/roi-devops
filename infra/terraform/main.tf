@@ -172,6 +172,36 @@ resource "aws_security_group_rule" "monitoring_to_web_8080" {
   description              = "Allow VPC to scrape cAdvisor"
 }
 
+resource "aws_security_group_rule" "monitoring_to_web_5000" {
+  type                     = "ingress"
+  from_port                = 5000
+  to_port                  = 5000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.web_sg.id
+  cidr_blocks              = [data.aws_vpc.default.cidr_block]
+  description              = "Allow VPC to scrape backend metrics (blue)"
+}
+
+resource "aws_security_group_rule" "monitoring_to_web_5002" {
+  type                     = "ingress"
+  from_port                = 5002
+  to_port                  = 5002
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.web_sg.id
+  cidr_blocks              = [data.aws_vpc.default.cidr_block]
+  description              = "Allow VPC to scrape backend metrics (green)"
+}
+
+resource "aws_security_group_rule" "monitoring_self_9100" {
+  type                     = "ingress"
+  from_port                = 9100
+  to_port                  = 9100
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.monitoring_sg.id
+  cidr_blocks              = [data.aws_vpc.default.cidr_block]
+  description              = "Allow VPC to scrape Monitoring Node Exporter"
+}
+
 data "aws_vpc" "default" {
   default = true
 }

@@ -19,11 +19,23 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: roi-backend
+  - job_name: roi-backend-blue
     metrics_path: /api/metrics
     ec2_sd_configs:
       - region: us-east-1
         port: 5000
+    relabel_configs:
+      - source_labels: [__meta_ec2_tag_Name]
+        regex: roi-web-server
+        action: keep
+      - source_labels: [__meta_ec2_private_ip]
+        target_label: instance
+
+  - job_name: roi-backend-green
+    metrics_path: /api/metrics
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 5002
     relabel_configs:
       - source_labels: [__meta_ec2_tag_Name]
         regex: roi-web-server
@@ -48,7 +60,7 @@ scrape_configs:
         port: 8080
     relabel_configs:
       - source_labels: [__meta_ec2_tag_Name]
-        regex: roi-web-server|roi-monitoring-server
+        regex: roi-web-server
         action: keep
       - source_labels: [__meta_ec2_private_ip]
         target_label: instance
