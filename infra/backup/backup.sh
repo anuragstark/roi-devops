@@ -12,7 +12,10 @@ echo "[$(date)] Starting ROI Platform Database Backup..."
 # 1. Dump the database and compress it
 # --no-tablespaces prevents permissions errors if the AWS RDS user lacks PROCESS privileges
 echo "[$(date)] Running mysqldump..."
-mysqldump -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" --no-tablespaces | gzip > /tmp/$BACKUP_FILE
+# Strip the port from DB_HOST if it exists (Terraform outputs often include :3306)
+HOST_ONLY=$${DB_HOST%:*}
+
+mysqldump -h "$HOST_ONLY" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" --no-tablespaces | gzip > /tmp/$BACKUP_FILE
 
 # 2. Upload to AWS S3
 echo "[$(date)] Uploading to S3 bucket ($S3_URI)..."
