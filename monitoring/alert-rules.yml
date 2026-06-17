@@ -9,8 +9,11 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "CPU usage above 80% for 5 minutes"
-          description: "Current CPU usage: {{ $value }}%"
+          summary: "⚠️ CPU usage above 80% for 5 minutes"
+          description: |
+            Server CPU has been running at {{ $value | printf "%.1f" }}% for the last 5 minutes.
+            This could indicate a resource-intensive process, a traffic spike, or a runaway container.
+            Action: SSH into the server and run `htop` to identify the process consuming CPU.
 
       - alert: HighMemoryUsage
         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
@@ -18,8 +21,12 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Memory usage above 85%"
-          description: "Current memory usage: {{ $value }}%"
+          summary: "⚠️ Memory usage above 85%"
+          description: |
+            Server RAM usage is at {{ $value | printf "%.1f" }}%.
+            Total RAM: {{ with query "node_memory_MemTotal_bytes" }}{{ . | first | value | humanize1024 }}{{ end }}.
+            When memory runs out, the Linux OOM killer will terminate containers randomly.
+            Action: Check container memory usage with `docker stats` on the server.
 
       - alert: DiskSpaceRunningLow
         expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
@@ -27,8 +34,11 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Disk space below 15%"
-          description: "Available disk: {{ $value }}%"
+          summary: "🔴 Disk space below 15%"
+          description: |
+            Only {{ $value | printf "%.1f" }}% disk space remaining on the root volume.
+            Docker images, logs, and database backups consume disk space over time.
+            Action: Run `docker system prune -a` to clean unused images, or resize the EBS volume in AWS Console.
 
       - alert: DiskSpaceCritical
         expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 5
@@ -36,7 +46,24 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "CRITICAL: Disk space below 5%"
+          summary: "🚨 CRITICAL: Disk space below 5% — Server may crash!"
+          description: |
+            Only {{ $value | printf "%.1f" }}% disk space remaining. The server is about to run out of disk.
+            Docker will fail to pull images, logs will stop writing, and databases may corrupt.
+            Action: IMMEDIATELY clean up disk space or resize the EBS volume in AWS Console.
+
+      - alert: HighSwapUsage
+        expr: (node_memory_SwapTotal_bytes > 0) and ((node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / node_memory_SwapTotal_bytes * 100) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ Swap usage above 50%"
+          description: |
+            Swap usage is at {{ $value | printf "%.1f" }}%. Your server is running low on physical RAM
+            and is using the swap file on disk, which is 10-100x slower than RAM.
+            This causes severe performance degradation for all containers.
+            Action: Consider upgrading the EC2 instance type (e.g., t3.small → t3.medium) or reducing container count.
 
   - name: application
     rules:
@@ -46,8 +73,23 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "ROI Backend is DOWN"
-          description: "Backend health check has been failing for 1 minute"
+          summary: "🚨 ROI Backend is DOWN"
+          description: |
+            The ROI Platform backend has been unreachable for over 1 minute.
+            All user logins, OTP verifications, investments, and withdrawals are BLOCKED.
+            Action: SSH into the web server and check backend logs with `docker logs roi_blue-backend-1 --tail 50` or `docker logs roi_green-backend-1 --tail 50`.
+
+      - alert: FrontendDown
+        expr: up{job="roi-frontend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚨 ROI Frontend is DOWN"
+          description: |
+            The ROI Platform frontend is unreachable. Users will see a blank page or connection error.
+            The website at paisatest.online is completely inaccessible.
+            Action: SSH into the web server and check frontend logs with `docker logs roi_blue-frontend-1 --tail 50` or `docker logs roi_green-frontend-1 --tail 50`.
 
       - alert: HighRequestLatency
         expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="roi-backend"}[5m])) > 2
@@ -55,7 +97,12 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "API p95 latency above 2s"
+          summary: "⚠️ API p95 latency above 2 seconds"
+          description: |
+            95% of API requests are taking longer than {{ $value | printf "%.2f" }} seconds to respond.
+            Users will experience slow page loads, timeouts during login, and failed transactions.
+            Common causes: Database slow queries, external API timeouts (ip-api.com), or CPU saturation.
+            Action: Check backend logs for slow queries and review Grafana dashboards.
 
       - alert: HighErrorRate
         expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
@@ -63,4 +110,35 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "HTTP 5xx error rate above 5%"
+          summary: "⚠️ HTTP 5xx error rate above 5%"
+          description: |
+            More than 5% of API requests are returning server errors (500/502/503).
+            Current error rate: {{ $value | printf "%.2f" }}%.
+            Users are experiencing failed logins, broken dashboards, or failed transactions.
+            Action: Check backend logs immediately for unhandled exceptions or database errors.
+
+      - alert: ContainerRestartLoop
+        expr: increase(container_restart_count[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚨 Container is crash-looping"
+          description: |
+            A Docker container has restarted more than 3 times in the last 15 minutes.
+            This indicates the container is crashing immediately after startup — likely due to
+            a missing environment variable, a permission error, or a code bug.
+            Action: Run `docker ps -a` to identify the crashing container, then `docker logs <container_name> --tail 100` to see the crash reason.
+
+      - alert: SSLCertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ SSL Certificate expires in less than 14 days"
+          description: |
+            The SSL certificate for paisatest.online will expire in {{ $value | printf "%.0f" }} days.
+            Once it expires, users will see a scary "Your connection is not private" warning
+            and Chrome will block access to the site entirely.
+            Action: Renew the certificate by running `sudo certbot renew` on the web server, or check your auto-renewal cron job.
