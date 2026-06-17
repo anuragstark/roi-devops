@@ -78,6 +78,38 @@ resource "aws_security_group" "web_sg" {
     description = "HTTPS access"
   }
 
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to scrape Node Exporter"
+  }
+
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to scrape cAdvisor"
+  }
+
+  ingress {
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to scrape backend metrics (blue)"
+  }
+
+  ingress {
+    from_port   = 5002
+    to_port     = 5002
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to scrape backend metrics (green)"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -105,6 +137,38 @@ resource "aws_security_group" "monitoring_sg" {
     description = "SSH access"
   }
 
+  ingress {
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to access Grafana"
+  }
+
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to access Prometheus"
+  }
+
+  ingress {
+    from_port   = 9093
+    to_port     = 9093
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to access Alertmanager"
+  }
+
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to scrape Monitoring Node Exporter"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -117,89 +181,6 @@ resource "aws_security_group" "monitoring_sg" {
     Name        = "roi-monitoring-sg"
     Environment = var.environment
   }
-}
-
-# Cross-Communication Rules (Preventing Circular Dependencies)
-# Web -> Monitoring (Nginx proxying to Grafana/Prometheus/Alertmanager)
-resource "aws_security_group_rule" "web_to_monitoring_3001" {
-  type                     = "ingress"
-  from_port                = 3001
-  to_port                  = 3001
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to access Grafana"
-}
-
-resource "aws_security_group_rule" "web_to_monitoring_9090" {
-  type                     = "ingress"
-  from_port                = 9090
-  to_port                  = 9090
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to access Prometheus"
-}
-
-resource "aws_security_group_rule" "web_to_monitoring_9093" {
-  type                     = "ingress"
-  from_port                = 9093
-  to_port                  = 9093
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to access Alertmanager"
-}
-
-# Monitoring -> Web (Prometheus scraping Node Exporter and cAdvisor)
-resource "aws_security_group_rule" "monitoring_to_web_9100" {
-  type                     = "ingress"
-  from_port                = 9100
-  to_port                  = 9100
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.web_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to scrape Node Exporter"
-}
-
-resource "aws_security_group_rule" "monitoring_to_web_8080" {
-  type                     = "ingress"
-  from_port                = 8080
-  to_port                  = 8080
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.web_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to scrape cAdvisor"
-}
-
-resource "aws_security_group_rule" "monitoring_to_web_5000" {
-  type                     = "ingress"
-  from_port                = 5000
-  to_port                  = 5000
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.web_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to scrape backend metrics (blue)"
-}
-
-resource "aws_security_group_rule" "monitoring_to_web_5002" {
-  type                     = "ingress"
-  from_port                = 5002
-  to_port                  = 5002
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.web_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to scrape backend metrics (green)"
-}
-
-resource "aws_security_group_rule" "monitoring_self_9100" {
-  type                     = "ingress"
-  from_port                = 9100
-  to_port                  = 9100
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.monitoring_sg.id
-  cidr_blocks              = [data.aws_vpc.default.cidr_block]
-  description              = "Allow VPC to scrape Monitoring Node Exporter"
 }
 
 data "aws_vpc" "default" {
