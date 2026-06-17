@@ -1,8 +1,6 @@
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/anuragstark/roi-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -31,11 +29,7 @@ services:
       - roi_network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL}
+    image: ghcr.io/anuragstark/roi-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       - backend
@@ -50,9 +44,7 @@ services:
 
   # ROI Cron Worker - Runs hourly to credit ROI to active investments
   roi-cron:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/anuragstark/roi-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       backend:
