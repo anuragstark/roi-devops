@@ -221,6 +221,10 @@ jobs:
             if ! command -v age &> /dev/null; then
               sudo apt-get update -qq && sudo apt-get install -y -qq age
             fi
+            
+            # Securely download .env.enc from the private repository
+            curl -s -H "Authorization: token ${{ secrets.GH_PAT }}" -H "Accept: application/vnd.github.v3.raw" -L "https://api.github.com/repos/anuragstark/Roi-project/contents/.env.enc" -o .env.enc
+            
             sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env
             rm -f /home/ubuntu/key.txt
             
