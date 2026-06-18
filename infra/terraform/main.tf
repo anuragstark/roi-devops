@@ -146,6 +146,14 @@ resource "aws_security_group" "monitoring_sg" {
   }
 
   ingress {
+    from_port   = 3100
+    to_port     = 3100
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "Allow VPC to push logs to Loki"
+  }
+
+  ingress {
     from_port   = 9090
     to_port     = 9090
     protocol    = "tcp"

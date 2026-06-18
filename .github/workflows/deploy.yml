@@ -56,8 +56,8 @@ jobs:
       - name: Ensure Cross-Communication SG Rules
         run: |
           VPC_CIDR="172.31.0.0/16"
-          # Monitoring SG: Allow VPC access to Grafana, Prometheus, Alertmanager, Node Exporter
-          for PORT in 3001 9090 9093 9100; do
+          # Monitoring SG: Allow VPC access to Grafana, Prometheus, Alertmanager, Node Exporter, Loki
+          for PORT in 3001 3100 9090 9093 9100; do
             aws ec2 authorize-security-group-ingress --group-id ${{ env.MONITORING_SG_ID }} \
               --protocol tcp --port $PORT --cidr $VPC_CIDR 2>/dev/null || true
           done
@@ -236,6 +236,7 @@ jobs:
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
             echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
+            echo "LOKI_URL=http://${{ env.MONITORING_PRIVATE_IP }}:3100/loki/api/v1/push" >> .env
             
             docker network create roi_global_network || true
             
