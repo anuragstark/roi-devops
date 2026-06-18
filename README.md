@@ -1,5 +1,7 @@
 # ROI Investment Platform - DevOps & Infrastructure
 
+![Architecture Diagram](deploymnet%20screenshots%20/Roi_Architecture.png)
+
 This repository contains the advanced Infrastructure as Code (IaC), CI/CD pipelines, container orchestration, and observability stack for the ROI Investment Platform. 
 
 > **Note:** The core application source code (backend APIs, frontend UI) is kept in a separate private repository for security reasons. This repository demonstrates the DevOps and Platform Engineering architecture used to host the platform securely, cost-effectively, and with zero downtime.
@@ -9,8 +11,10 @@ This repository contains the advanced Infrastructure as Code (IaC), CI/CD pipeli
 * **Infrastructure as Code:** Terraform is used to provision all AWS resources (EC2, VPC, IAM, Security Groups, S3). We use an S3 remote state with DynamoDB locking.
 * **Cost Optimization:** The architecture utilizes **Auto Scaling Groups** and **EC2 Spot Instances** (`t3.small`) for both the Web and Monitoring servers, achieving roughly 70% cost savings compared to On-Demand pricing.
 * **CI/CD Automation:** GitHub Actions powers the entire lifecycle. Workflows handle Continuous Integration, Infrastructure Drift Detection, full deployments, and automated teardowns.
+  <br>![CI/CD Workflows](deploymnet%20screenshots%20/roi-devops_pblic_allworkflow.png)
 * **Deployment Strategy:** A fully automated **Blue/Green Deployment** strategy ensures zero-downtime updates. NGINX dynamically hot-swaps traffic to new Docker containers only after they successfully pass health checks.
 * **Observability (PLG Stack):** A dedicated monitoring server runs Prometheus, Grafana, Loki, Tempo, and Alertmanager. All application logs and metrics are securely scraped across the AWS private network. Alertmanager is configured to send automated email alerts if system resources hit critical thresholds.
+  <br>![Grafana Dashboard](deploymnet%20screenshots%20/Grafana_App_node1.png)
 * **Secrets Management:** Mozilla SOPS with Age encryption is used. No plain-text `.env` files are stored in the repository.
 
 ## Repository Structure
@@ -31,6 +35,8 @@ This repository contains the advanced Infrastructure as Code (IaC), CI/CD pipeli
 - **Automated SSL/TLS**: The deployment pipeline automatically triggers `certbot` to issue and renew Let's Encrypt certificates for all domains (`paisatest.online`, `grafana.paisatest.online`, `prometheus.paisatest.online`).
 - **Internal VPC Routing**: The Nginx reverse proxy dynamically fetches the Monitoring Server's Private IP, ensuring that metrics and dashboards are routed securely through the internal AWS network via strict Security Groups.
 - **Encrypted State**: Terraform state files are encrypted at rest in S3, and environment variables are strictly decrypted at runtime during the CI/CD pipeline execution using SOPS.
+- **Shift-Left Security**: Integrated Trivy vulnerability scanning into the CI/CD pipeline, generating HTML reports and alerting developers immediately via email.
+  <br>![Trivy Security Report](deploymnet%20screenshots%20/trivy%20report%20email1.png)
 
 ---
 
